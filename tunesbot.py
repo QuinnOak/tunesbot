@@ -189,7 +189,10 @@ class Music:
             format_string = 'I could not process this request. Printing trace: ```py\n{}: {}\n```'
             await self.bot.send_message(context.message.channel, format_string.format(type(e).__name__, e))
         else:
-            player.volume = 0.6
+            if state.current_request is not None:
+                player.volume = state.current_request.process_player.volume
+            else:
+                player.volume = 0.6
             request = QueuedRequest(context.message, player)
             if was_playing:
                 await self.bot.send_message(context.message.channel, 'Added to queue:\n' + str(request))
@@ -336,6 +339,12 @@ bot = commands.Bot(
     command_prefix=commands.when_mentioned_or(
         'Alexa, ',
         '~',
+        'alexa ',
+        'alexa, ',
+        'slave ',
+        'slave, ',
+        ':CattoBlush: ',
+        ':CattoBlush:',
         'Alexa '),
     description='I\'m literally just a youtube-dl wrapper and audio streaming slave. Please get me out of here.')
 bot.add_cog(Music(bot))
