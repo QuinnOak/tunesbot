@@ -275,7 +275,7 @@ class Music:
         if isinstance(error, commands.BadArgument):
             await self.bot.send_message(
                 context.message.channel,
-                "You need to give me a number, this really isn't that hard.")
+                "You need to give me an integer between 0 and 100.")
 
     @commands.command(pass_context=True, no_pm=True)
     async def pause(self, context):
