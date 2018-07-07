@@ -1,4 +1,4 @@
-# music slave for discord
+# TunesBot for discord
 An Discord bot that plays music using the `youtube-dl` module for python.
 
 ## How to set this up:
