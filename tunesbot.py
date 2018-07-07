@@ -1,7 +1,9 @@
+import sys
+import traceback
 import asyncio
 import discord
 from discord.ext import commands
-from credentials import TOKEN, KEY, BOTID, OWNERID
+from credentials import TOKEN, OWNERID
 
 
 class QueueState:
@@ -32,7 +34,9 @@ class QueueState:
         while True:
             self.next_song.clear()
             self.current_request = await self.queued_songs.get()
-            await self.bot.send_message(self.current_request.channel, 'I\'m currently playing:\n' + str(self.current_request))
+            await self.bot.send_message(self.current_request.channel,
+                                        'I\'m currently playing:\n' +
+                                        str(self.current_request))
             self.current_request.process_player.start()
             await self.next_song.wait()
 
@@ -105,7 +109,8 @@ class Music:
 
         elif isinstance(error, commands.NoPrivateMessage):
             try:
-                return await context.author.send(f'{context.command} can not be used in Private Messages.')
+                return await context.author.send(
+                    f'{context.command} can not be used in Private Messages.')
             except BaseException:
                 pass
         print(
@@ -135,27 +140,36 @@ class Music:
             await state.voice_client.move_to(channel)
             success = True
         except discord.InvalidArgument:
-            await self.bot.send_message(context.message.channel, 'I couldn\'t find that channel in this Discord server.')
+            await self.bot.send_message(
+                context.message.channel,
+                'I couldn\'t find that channel in this Discord server.')
 
         if success:
-            await self.bot.send_message(context.message.channel, 'I have joined **' + channel.name + '**')
+            await self.bot.send_message(
+                context.message.channel,
+                'I have joined **' + channel.name + '**')
 
     @join.error
     async def on_join_error(self, error, context):
         if isinstance(error, commands.BadArgument):
-            await self.bot.send_message(context.message.channel, "I couldn\'t find that channel in this Discord server.")
+            await self.bot.send_message(
+                context.message.channel,
+                "I couldn\'t find that channel in this Discord server.")
 
     @commands.command(pass_context=True, no_pm=True)
     async def summon(self, context):
         """Summons me to join your voice channel."""
         user_current_channel = context.message.author.voice_channel
         if user_current_channel is None:
-            await self.bot.send_message(context.message.channel, 'You must be in a voice channel to summon me.')
+            await self.bot.send_message(
+                context.message.channel,
+                'You must be in a voice channel to summon me.')
             return False
 
         state = self.get_queue_state(context.message.server)
         if state.voice_client is None:
-            state.voice_client = await self.bot.join_voice_channel(user_current_channel)
+            state.voice_client = await self.bot.join_voice_channel(
+                user_current_channel)
         else:
             await state.voice_client.move_to(user_current_channel)
 
@@ -184,10 +198,17 @@ class Music:
                 return
         was_playing = self.get_queue_state(context.message.server).is_playing()
         try:
-            player = await state.voice_client.create_ytdl_player(request, ytdl_options=options, after=state.toggle_next)
+            player = await state.voice_client.create_ytdl_player(
+                request,
+                ytdl_options=options,
+                after=state.toggle_next)
         except Exception as e:
-            format_string = 'I could not process this request. Printing trace: ```py\n{}: {}\n```'
-            await self.bot.send_message(context.message.channel, format_string.format(type(e).__name__, e))
+            format_string = \
+                ('I could not process this request. '
+                 'Printing trace: ```py\n{}: {}\n```')
+            await self.bot.send_message(context.message.channel,
+                                        format_string.format(
+                                            type(e).__name__, e))
         else:
             if state.current_request is not None:
                 player.volume = state.current_request.process_player.volume
@@ -195,7 +216,9 @@ class Music:
                 player.volume = 0.6
             request = QueuedRequest(context.message, player)
             if was_playing:
-                await self.bot.send_message(context.message.channel, 'Added to queue:\n' + str(request))
+                await self.bot.send_message(
+                    context.message.channel,
+                    'Added to queue:\n' + str(request))
             await state.queued_songs.put(request)
 
     @play.error
@@ -207,7 +230,10 @@ class Music:
                 if prefix in context.message.content:
                     used_prefix = prefix
                     break
-            await self.bot.send_message(context.message.channel, "You need to request something as follows: \n" + used_prefix + "play <request>")
+            await self.bot.send_message(context.message.channel,
+                                        ('You need to request '
+                                         'something as follows: \n') +
+                                        used_prefix + "play <request>")
 
     @commands.command(pass_context=True, no_pm=True)
     async def volume(self, context, percentage: int):
@@ -224,20 +250,32 @@ class Music:
                 if prefix in context.message.content:
                     used_prefix = prefix
                     break
-            await self.bot.send_message(context.message.channel, "You need to give me a volume level between 0-100 as follows: \n" + used_prefix + "volume <percentage>")
+            await self.bot.send_message(
+                context.message.channel,
+                ('You need to give me a volume level '
+                 'between 0-100 as follows: \n') +
+                used_prefix + "volume <percentage>")
             return
 
         if state.is_playing():
             player = state.process_player
             player.volume = percentage / 100
-            await self.bot.send_message(context.message.channel, 'I set the volume to {:.0%}.'.format(player.volume))
+            await self.bot.send_message(
+                context.message.channel,
+                'I set the volume to {:.0%}.'.format(player.volume))
         else:
-            await self.bot.send_message(context.message.channel, "I can\'t set the volume because I\'m not playing anything right now.")
+            await self.bot.send_message(
+                context.message.channel,
+                ('I can\'t set the volume because '
+                 'I\'m not playing anything right now.')
+            )
 
     @volume.error
     async def on_volume_error(self, error, context):
         if isinstance(error, commands.BadArgument):
-            await self.bot.send_message(context.message.channel, "You need to give me a number, this really isn't that hard.")
+            await self.bot.send_message(
+                context.message.channel,
+                "You need to give me a number, this really isn't that hard.")
 
     @commands.command(pass_context=True, no_pm=True)
     async def pause(self, context):
@@ -247,7 +285,9 @@ class Music:
             player = state.process_player
             player.pause()
         else:
-            await self.bot.send_message(context.message.channel, "I\'m not playing anything right now.")
+            await self.bot.send_message(
+                context.message.channel,
+                "I\'m not playing anything right now.")
 
     @commands.command(pass_context=True, no_pm=True)
     async def resume(self, context):
@@ -257,7 +297,9 @@ class Music:
             player = state.process_player
             player.resume()
         else:
-            await self.bot.send_message(context.message.channel, "I have nothing to resume.")
+            await self.bot.send_message(
+                context.message.channel,
+                "I have nothing to resume.")
 
     @commands.command(pass_context=True, no_pm=True)
     async def stop(self, context):
@@ -289,9 +331,13 @@ class Music:
         state = self.get_queue_state(context.message.server)
         if not state.is_playing():
             if state.current_request.process_player.after is None:
-                await self.bot.send_message(context.message.channel, 'I\'m not playing anything right now.')
+                await self.bot.send_message(
+                    context.message.channel,
+                    'I\'m not playing anything right now.')
             else:
-                await self.bot.send_message(context.message.channel, 'Skipping...')
+                await self.bot.send_message(
+                    context.message.channel,
+                    'Skipping...')
                 state.current_request.process_player.stop()
             return
 
@@ -308,14 +354,23 @@ class Music:
                     state.skip_requests.add(voter.id)
                     total_requests = len(state.skip_requests)
                     if total_requests >= self.votes_to_skip:
-                        await self.bot.send_message(context.message.channel, 'Skipping...')
-                        if not state.current_request.process_player._resumed.is_set():
+                        await self.bot.send_message(
+                            context.message.channel,
+                            'Skipping...')
+                        if not state.current_request.process_player.\
+                           _resumed.is_set():
                             context.invoke(self.resume)
                         state.skip()
                     else:
-                        await self.bot.send_message(context.message.channel, '**{0}/{1}** people have asked me to skip this.'.format(total_requests, self.votes_to_skip))
+                        await self.bot.send_message(
+                            context.message.channel,
+                            '**{0}/{1}** people have asked me to skip this.'
+                            .format(total_requests, self.votes_to_skip))
                 else:
-                    await self.bot.send_message(context.message.channel, 'I\'m gonna be real with you chief, you\'ve already asked me to skip this.')
+                    await self.bot.send_message(
+                        context.message.channel,
+                        ('I\'m gonna be real with you chief, you\'ve'
+                         'already asked me to skip this.'))
             else:
                 if voter.id not in state.skip_requests:
                     state.skip_requests.add(voter.id)
@@ -326,13 +381,28 @@ class Music:
         """I will tell you about the current request."""
         state = self.get_queue_state(context.message.server)
         if state.current_request is None:
-            await self.bot.send_message(context.message.channel, 'I\'m not playing anything right now.')
+            await self.bot.send_message(
+                context.message.channel,
+                'I\'m not playing anything right now.')
         else:
             skip_requests = len(state.skip_requests)
             if str(state.current_request.user_requester.id) != OWNERID:
-                await self.bot.send_message(context.message.channel, 'I\'m currently playing:\n{}\n**{}/{}** people have asked me to skip this.'.format(state.current_request, skip_requests, self.votes_to_skip))
+                await self.bot.send_message(
+                    context.message.channel,
+                    ('I\'m currently playing:\n{}\n**{}/{}** people '
+                     'have asked me to skip this.').format(
+                        state.current_request,
+                        skip_requests,
+                        self.votes_to_skip))
             else:
-                await self.bot.send_message(context.message.channel, 'I\'m currently playing:\n{}\n**{}/{}** people have asked me to skip this, but I don\'t really care.'.format(state.current_request, skip_requests, self.votes_to_skip))
+                await self.bot.send_message(
+                    context.message.channel,
+                    ('I\'m currently playing:\n{}\n**{}/{}** people have '
+                     'asked me to skip this, '
+                     'but I don\'t really care.').format(
+                        state.current_request,
+                        skip_requests,
+                        self.votes_to_skip))
 
 
 bot = commands.Bot(
@@ -346,7 +416,8 @@ bot = commands.Bot(
         ':CattoBlush: ',
         ':CattoBlush:',
         'Alexa '),
-    description='I\'m literally just a youtube-dl wrapper and audio streaming slave. Please get me out of here.')
+    description=('I\'m literally just a youtube-dl wrapper and audio '
+                 'streaming slave. Please get me out of here.'))
 bot.add_cog(Music(bot))
 
 
