@@ -6,13 +6,28 @@ from discord.ext import commands
 from credentials import TOKEN, OWNERID
 
 
+class ListableQueue(asyncio.Queue):
+    async def to_list(self):
+        queue_copy = []
+        while True:
+            try:
+                elem = self.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+            else:
+                queue_copy.append(elem)
+        for elem in queue_copy:
+            self.put(elem)
+        return queue_copy
+
+
 class QueueState:
     def __init__(self, bot):
         self.current_request = None
         self.voice_client = None
         self.bot = bot
         self.audio_task = self.bot.loop.create_task(self.audio_player_task())
-        self.queued_songs = asyncio.Queue()
+        self.queued_songs = ListableQueue()
         self.next_song = asyncio.Event()
         self.skip_requests = set()
 
@@ -22,9 +37,13 @@ class QueueState:
         player = self.current_request.process_player
         return not player.is_done()
 
+    def get_queued_info(self):
+        return self.queued_songs.to_list()
+
     def skip(self):
         self.skip_requests.clear()
         if self.is_playing():
+            self.queued_songs.task_done()
             self.current_request.process_player.stop()
 
     def toggle_next(self):
@@ -34,6 +53,7 @@ class QueueState:
         while True:
             self.next_song.clear()
             self.current_request = await self.queued_songs.get()
+            await self.current_request.refresh_player(self)
             await self.bot.send_message(self.current_request.channel,
                                         'I\'m currently playing:\n' +
                                         str(self.current_request))
@@ -46,10 +66,24 @@ class QueueState:
 
 
 class QueuedRequest:
-    def __init__(self, message, player):
+    def __init__(self, message, player, request_string):
         self.user_requester = message.author
         self.channel = message.channel
         self.process_player = player
+        self.options = \
+            {
+                'default_search': 'auto',
+                'quiet': True,
+            }
+
+        self.request_string = request_string
+
+    async def refresh_player(self, current_state):
+        self.process_player = await current_state.\
+            voice_client.create_ytdl_player(
+                self.request_string,
+                ytdl_options=self.options,
+                after=current_state.toggle_next)
 
     def __str__(self):
         format_string = '**{0.title}**'
@@ -214,12 +248,12 @@ class Music:
                 player.volume = state.current_request.process_player.volume
             else:
                 player.volume = 0.6
-            request = QueuedRequest(context.message, player)
+            queued_request = QueuedRequest(context.message, player, request)
             if was_playing:
                 await self.bot.send_message(
                     context.message.channel,
-                    'Added to queue:\n' + str(request))
-            await state.queued_songs.put(request)
+                    'Added to queue:\n' + str(queued_request))
+            await state.queued_songs.put(queued_request)
 
     @play.error
     async def on_play_error(self, error, context):
@@ -334,12 +368,7 @@ class Music:
                 await self.bot.send_message(
                     context.message.channel,
                     'I\'m not playing anything right now.')
-            else:
-                await self.bot.send_message(
-                    context.message.channel,
-                    'Skipping...')
-                state.current_request.process_player.stop()
-            return
+                return
 
         voter = context.message.author
         if voter == state.current_request.user_requester or str(
@@ -403,6 +432,16 @@ class Music:
                         state.current_request,
                         skip_requests,
                         self.votes_to_skip))
+
+    @commands.command(pass_context=True, no_pm=True)
+    async def queue(self, context):
+        """I will list all songs currently queued."""
+        state = self.get_queue_state(context.message.server)
+        queued_info = await state.get_queued_info()
+        for song_info in queued_info:
+            self.bot.send_message(
+                context.message.channel,
+                str(song_info))
 
 
 bot = commands.Bot(
