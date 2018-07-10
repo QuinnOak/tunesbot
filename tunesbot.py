@@ -368,7 +368,12 @@ class Music:
                 await self.bot.send_message(
                     context.message.channel,
                     'I\'m not playing anything right now.')
-                return
+            else:
+                await self.bot.send_message(
+                    context.message.channel,
+                    'Skipping...')
+                state.current_request.process_player.stop()
+            return
 
         voter = context.message.author
         if voter == state.current_request.user_requester or str(
